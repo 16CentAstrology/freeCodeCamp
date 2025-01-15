@@ -7,11 +7,26 @@ import { config } from 'dotenv';
 const envPath = resolve(__dirname, '../../.env');
 config({ path: envPath });
 
-import { availableLangs } from '../../config/i18n';
-import { getChallengesForLang } from '../../curriculum/getChallenges';
-import { SuperBlocks } from '../../config/certification-settings';
-import { ChallengeNode } from '../../client/src/redux/prop-types';
-import { getAuditedSuperBlocks } from '../../config/superblock-order';
+import { availableLangs } from '../../shared/config/i18n';
+import { getChallengesForLang } from '../../curriculum/get-challenges';
+import {
+  SuperBlocks,
+  getAuditedSuperBlocks
+} from '../../shared/config/curriculum';
+
+// TODO: re-organise the types to a common 'types' folder that can be shared
+// between the workspaces so we don't have to declare ChallengeNode here and in
+// the client.
+
+// This cannot be imported from the client, without causing tsc to attempt to
+// compile the client (something it cannot do)
+type ChallengeNode = {
+  block: string;
+  dashedName: string;
+  superBlock: SuperBlocks;
+  id: string;
+  challengeType: number;
+};
 
 const superBlockFolderMap = {
   'responsive-web-design': '01-responsive-web-design',
@@ -28,13 +43,19 @@ const superBlockFolderMap = {
   'coding-interview-prep': '11-coding-interview-prep',
   'relational-database': '13-relational-database',
   '2022/responsive-web-design': '14-responsive-web-design-22',
-  '2022/javascript-algorithms-and-data-structures':
-    '15-javascript-algorithms-and-data-structures-22'
+  'javascript-algorithms-and-data-structures-v8':
+    '15-javascript-algorithms-and-data-structures-22',
+  'the-odin-project': '16-the-odin-project',
+  'college-algebra-with-python': '17-college-algebra-with-python',
+  'project-euler': '18-project-euler',
+  'foundational-c-sharp-with-microsoft':
+    '19-foundational-c-sharp-with-microsoft',
+  'a2-english-for-developers': '21-a2-english-for-developers',
+  'rosetta-code': '22-rosetta-code',
+  'python-for-everybody': '23-python-for-everybody',
+  'b1-english-for-developers': '24-b1-english-for-developers',
+  'full-stack-developer': '25-front-end-development'
 };
-
-// These blocks are in the incorrect superblock. They should be moved but, for
-// the audit, we just ignore them.
-const blocksThatNeedToMove = ['d3-dashboard'];
 
 // Adding types for getChallengesForLang is possible, but not worth the effort
 // at this time.
@@ -52,7 +73,7 @@ const getChallenges = async (lang: string) => {
         key => superBlock[key].challenges
       );
       return [...challengeArray, ...flatten(challengesForBlock)];
-    }, []) as unknown as ChallengeNode['challenge'][];
+    }, []) as unknown as ChallengeNode[];
 };
 
 /* eslint-enable @typescript-eslint/no-unsafe-return */
@@ -75,6 +96,9 @@ void (async () => {
       join(englishCurriculumDirectory, englishSuperblock)
     );
     for (const englishBlock of englishBlocks) {
+      if (englishBlock.endsWith('.txt')) {
+        continue;
+      }
       const englishChallenges = await readdir(
         join(englishCurriculumDirectory, englishSuperblock, englishBlock)
       );
@@ -86,20 +110,18 @@ void (async () => {
     }
   }
   const langsToCheck = availableLangs.curriculum.filter(
-    lang => lang !== 'english'
+    lang => String(lang) !== 'english'
   );
-  for (const lang of langsToCheck) {
-    console.log(`\n=== ${lang} ===`);
-    const certs = getAuditedSuperBlocks({
-      language: lang,
-      showNewCurriculum: process.env.SHOW_NEW_CURRICULUM,
-      showUpcomingChanges: process.env.SHOW_UPCOMING_CHANGES
-    });
+  for (const language of langsToCheck) {
+    console.log(`\n=== ${language} ===`);
+    const certs = getAuditedSuperBlocks({ language });
     const langCurriculumDirectory = join(
       process.cwd(),
       'curriculum',
+      'i18n-curriculum',
+      'curriculum',
       'challenges',
-      lang
+      language
     );
     const auditedFiles = englishFilePaths.filter(file =>
       certs.some(
@@ -113,7 +135,7 @@ void (async () => {
     const noMissingFiles = await auditChallengeFiles(auditedFiles, {
       langCurriculumDirectory
     });
-    const noDuplicateSlugs = await auditSlugs(lang, certs);
+    const noDuplicateSlugs = await auditSlugs(language, certs);
     if (noMissingFiles && noDuplicateSlugs) {
       console.log(`All challenges pass.`);
     } else {
@@ -129,9 +151,6 @@ async function auditChallengeFiles(
 ) {
   let auditPassed = true;
   for (const file of auditedFiles) {
-    if (blocksThatNeedToMove.some(block => file.includes(`/${block}/`))) {
-      continue;
-    }
     const filePath = join(langCurriculumDirectory, file);
     const fileExists = await access(filePath)
       .then(() => true)

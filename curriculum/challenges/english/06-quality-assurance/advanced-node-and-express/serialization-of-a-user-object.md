@@ -8,7 +8,7 @@ dashedName: serialization-of-a-user-object
 
 # --description--
 
-Serialization and deserialization are important concepts in regards to authentication. To serialize an object means to convert its contents into a small *key* that can then be deserialized into the original object. This is what allows us to know who has communicated with the server without having to send the authentication data, like the username and password, at each request for a new page.
+Serialization and deserialization are important concepts in regard to authentication. To serialize an object means to convert its contents into a small *key* that can then be deserialized into the original object. This is what allows us to know who has communicated with the server without having to send the authentication data, like the username and password, at each request for a new page.
 
 To set this up properly, you need to have a serialize function and a deserialize function. In Passport, these can be created with:
 
@@ -50,7 +50,7 @@ Submit your page when you think you've got it right. If you're running into erro
 
 # --hints--
 
-You should serialize user function correctly.
+You should serialize the user object correctly.
 
 ```js
 async (getUserInput) => {
@@ -70,7 +70,7 @@ async (getUserInput) => {
 }
 ```
 
-You should deserialize user function correctly.
+You should deserialize the user object correctly.
 
 ```js
 async (getUserInput) => {
@@ -125,12 +125,3 @@ async (getUserInput) => {
 }
 ```
 
-# --solutions--
-
-```js
-/**
-  Backend challenges don't need solutions, 
-  because they would need to be tested against a full working project. 
-  Please check our contributing guidelines to learn more.
-*/
-```

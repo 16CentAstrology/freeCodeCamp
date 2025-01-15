@@ -5,14 +5,23 @@ name: CI - E2E - 3rd party donation tests
 on:
   push:
     branches:
-      - 'prod-*'
+      - 'prod-**'
     paths-ignore:
       - 'docs/**'
+  # to test this ad-hoc
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   do-everything:
     name: Build & Test
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        node-version: [20.x]
     services:
       mongodb:
         image: mongo:4.4
@@ -26,44 +35,64 @@ jobs:
 
     steps:
       - name: Checkout Source Files
-        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # tag=v3
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          submodules: 'recursive'
 
       - name: Checkout client-config
-        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # tag=v3
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
         with:
           repository: freeCodeCamp/client-config
           path: client-config
 
-      - name: Use Node.js 16.x
-        uses: actions/setup-node@8c91899e586c5b171469028077307d293428b516 # tag=v3
+      - name: Setup pnpm
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d #v3.0.0
         with:
-          node-version: 16.x
+          version: 9
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 # v4.0.2
+        with:
+          node-version: ${{ matrix.node-version }}
+          # cypress-io/github-action caches the store, so we should not cache it
+          # here.
 
       - name: Set freeCodeCamp Environment Variables
         run: |
-          sed '/STRIPE/d; /PAYPAL/d;' sample.env > .env
+          sed '/STRIPE/d; /PAYPAL/d; /PATREON/d;' sample.env > .env
           echo 'STRIPE_PUBLIC_KEY=${{ secrets.STRIPE_PUBLIC_KEY }}' >> .env
-          echo 'STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}' >> .env
           echo 'PAYPAL_CLIENT_ID=${{ secrets.PAYPAL_CLIENT_ID }}' >> .env
-          echo 'PAYPAL_SECRET=${{ secrets.PAYPAL_SECRET }}' >> .env
+          echo 'PATREON_CLIENT_ID=${{ secrets.PATREON_CLIENT_ID }}' >> .env
 
       - name: Install and Build
         run: |
-          npm ci
-          npm run build
-      - name: Seed Database
-        run: npm run seed
+          pnpm install
+          pnpm run create:shared
+          pnpm run build:curriculum
+          pnpm run build:server
+
+      - name: Seed Database with Certified User
+        run: pnpm run seed:certified-user
+
       - name: Move serve.json to Public Folder
         run: cp client-config/serve.json client/public/serve.json
 
-      - name: Cypress run
-        uses: cypress-io/github-action@v4
-        with:
-          record: ${{ env.CYPRESS_RECORD_KEY != 0 }}
-          start: npm run start-ci
-          wait-on: http://localhost:8000
-          wait-on-timeout: 1200
-          config: baseUrl=http://localhost:8000
-          browser: chrome
+      # start-ci uses pm2, so it needs to be installed globally
+      - name: Install pm2
+        run: npm i -g pm2
 
-          spec: cypress/e2e/third-party/*.js
+      - name: Install playwright dependencies
+        run: npx playwright install --with-deps
+
+      - name: Run playwright tests
+        run: |
+          pnpm run start-ci &
+          sleep 10
+          npx playwright test third-party-donation.spec.ts --project=${{ matrix.browsers }}
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report-${{ matrix.browsers }}
+          path: playwright/reporter
+          retention-days: 30

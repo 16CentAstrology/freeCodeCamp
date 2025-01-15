@@ -1,5 +1,5 @@
 {
-  "help-translate-link-url": "https://contribute.freecodecamp.org/#/i18n/chinese/how-to-translate-files",
+  "help-translate-link-url": "https://contribute.freecodecamp.org/getting-started/#translations",
   "top-contributors": "https://www.freecodecamp.org/news/freecodecamp-top-contributors/",
   "footer": {
     "about-url": "https://chinese.freecodecamp.org/news/about/",
@@ -19,13 +19,16 @@
     "one-time-url": "https://paypal.me/freecodecamp"
   },
   "nav": {
+    "contribute": "https://contribute.freecodecamp.org/#/i18n/chinese/index",
     "forum": "https://forum.freecodecamp.org/c/chinese/533",
-    "news": "https://chinese.freecodecamp.org/news/"
+    "news": "https://chinese.freecodecamp.org/news/",
+    "podcast": "https://freecodecamp-in-chinese.transistor.fm/"
   },
   "help": {
     "HTML-CSS": "chinese/html-css",
     "JavaScript": "chinese/javascript",
     "Python": "chinese/python",
-    "Backend Development": "chinese/programming-help"
+    "Backend Development": "chinese/programming-help",
+    "English": "English"
   }
 }

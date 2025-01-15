@@ -1,16 +1,14 @@
 import React from 'react';
-import { Button, Modal } from '@freecodecamp/react-bootstrap';
 import { bindActionCreators, Dispatch, AnyAction } from 'redux';
 import { createSelector } from 'reselect';
 import { connect } from 'react-redux';
 import { useTranslation } from 'react-i18next';
+import { Button, Modal, Spacer } from '@freecodecamp/ui';
 
-import { ButtonSpacer } from '../helpers';
 import { hardGoTo as navigate, closeSignoutModal } from '../../redux/actions';
 import { isSignoutModalOpenSelector } from '../../redux/selectors';
-import { apiLocation } from '../../../../config/env.json';
-
-import './signout-modal.css';
+import { apiLocation } from '../../../config/env.json';
+import callGA from '../../analytics/call-ga';
 
 const mapStateToProps = createSelector(
   isSignoutModalOpenSelector,
@@ -44,24 +42,14 @@ function SignoutModal(props: SignoutModalProps): JSX.Element {
 
   const handleSignout = () => {
     closeSignoutModal();
+    callGA({ event: 'sign_out', user_id: undefined });
     navigate(`${apiLocation}/signout`);
   };
 
   return (
-    <Modal
-      aria-labelledby='modal-title'
-      backdrop={true}
-      bsSize='lg'
-      className='text-center'
-      keyboard={true}
-      onHide={handleModalHide}
-      onClose={handleModalHide}
-      show={show}
-    >
-      <Modal.Header closeButton={true}>
-        <Modal.Title id='modal-title' bsSize='lg'>
-          <span style={{ fontWeight: 'bold' }}>{t('signout.heading')}</span>
-        </Modal.Title>
+    <Modal size='large' variant='danger' open={show} onClose={handleModalHide}>
+      <Modal.Header showCloseButton={true} closeButtonClassNames='close'>
+        {t('signout.heading')}
       </Modal.Header>
       <Modal.Body>
         <p>
@@ -71,22 +59,18 @@ function SignoutModal(props: SignoutModalProps): JSX.Element {
         <hr />
         <Button
           block={true}
-          bsStyle='primary'
+          variant='primary'
           data-test-label='cancel-signout'
-          className='btn-invert'
           onClick={handleModalHide}
-          type='button'
         >
           {t('signout.nevermind')}
         </Button>
-        <ButtonSpacer />
+        <Spacer size='xs' />
         <Button
           block={true}
-          bsStyle='danger'
+          variant='danger'
           data-test-label='signout'
-          className='btn-signout'
           onClick={handleSignout}
-          type='button'
         >
           {t('signout.certain')}
         </Button>

@@ -1,15 +1,12 @@
 const path = require('path');
 const {
-  CurriculumMaps,
-  superBlockOrder,
-  SuperBlockStates,
-  TranslationStates,
-  orderedSuperBlockStates
-} = require('../config/superblock-order');
+  generateSuperBlockList,
+  SuperBlocks
+} = require('../shared/config/curriculum');
 
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
-const { availableLangs } = require('../config/i18n');
+const { availableLangs } = require('../shared/config/i18n');
 const curriculumLangs = availableLangs.curriculum;
 
 // checks that the CURRICULUM_LOCALE exists and is an available language
@@ -26,72 +23,29 @@ exports.testedLang = function testedLang() {
   }
 };
 
-/*
- * creates an object with all the superblocks in
- * 'superBlockOrder[lang][learn]' as keys and gives them
- * a number (superOrder), starting with 0, as the value
- */
-function createSuperOrder({
-  language = 'english',
-  showNewCurriculum = 'false',
-  showUpcomingChanges = 'false'
-}) {
-  if (!Object.prototype.hasOwnProperty.call(superBlockOrder, language)) {
-    throw Error(`${language} not found in superblock-order.ts`);
+function createSuperOrder(superBlocks) {
+  if (!Array.isArray(superBlocks)) {
+    throw Error(`superBlocks must be an Array`);
   }
-
-  if (
-    !Object.prototype.hasOwnProperty.call(superBlockOrder[language], [
-      CurriculumMaps.Learn
-    ])
-  ) {
-    throw Error(
-      `${language} does not have a 'learn' key in superblock-order.ts`
-    );
-  }
-
-  const audited =
-    superBlockOrder[language][CurriculumMaps.Learn][TranslationStates.Audited];
-  const notAudited =
-    superBlockOrder[language][CurriculumMaps.Learn][
-      TranslationStates.NotAudited
-    ];
+  superBlocks.forEach(superBlock => {
+    if (!Object.values(SuperBlocks).includes(superBlock)) {
+      throw Error(`Invalid superBlock: ${superBlock}`);
+    }
+  });
 
   const superOrder = {};
-  let i = 0;
 
-  function addToSuperOrder(superBlocks) {
-    superBlocks.forEach(key => {
-      superOrder[key] = i;
-      i++;
-    });
-  }
-
-  function canAddToSuperOrder(superBlockState) {
-    if (superBlockState === SuperBlockStates.New)
-      return showNewCurriculum === 'true';
-    if (superBlockState === SuperBlockStates.Upcoming)
-      return showUpcomingChanges === 'true';
-    return true;
-  }
-
-  function addSuperBlockStates(translationState) {
-    orderedSuperBlockStates.forEach(state => {
-      if (canAddToSuperOrder(state)) addToSuperOrder(translationState[state]);
-    });
-  }
-
-  addSuperBlockStates(audited);
-  addSuperBlockStates(notAudited);
+  superBlocks.forEach((superBlock, i) => {
+    superOrder[superBlock] = i;
+  });
 
   return superOrder;
 }
 
-const superOrder = createSuperOrder({
-  language: process.env.CURRICULUM_LOCALE,
-  showNewCurriculum: process.env.SHOW_NEW_CURRICULUM,
-  showUpcomingChanges: process.env.SHOW_UPCOMING_CHANGES
+const flatSuperBlockMap = generateSuperBlockList({
+  showUpcomingChanges: process.env.SHOW_UPCOMING_CHANGES === 'true'
 });
+const superOrder = createSuperOrder(flatSuperBlockMap);
 
 // gets the superOrder of a superBlock from the object created above
 function getSuperOrder(superblock) {
@@ -120,7 +74,17 @@ const directoryToSuperblock = {
   '13-relational-databases': 'relational-database',
   '14-responsive-web-design-22': '2022/responsive-web-design',
   '15-javascript-algorithms-and-data-structures-22':
-    '2022/javascript-algorithms-and-data-structures'
+    'javascript-algorithms-and-data-structures-v8',
+  '16-the-odin-project': 'the-odin-project',
+  '17-college-algebra-with-python': 'college-algebra-with-python',
+  '18-project-euler': 'project-euler',
+  '19-foundational-c-sharp-with-microsoft':
+    'foundational-c-sharp-with-microsoft',
+  '21-a2-english-for-developers': 'a2-english-for-developers',
+  '22-rosetta-code': 'rosetta-code',
+  '23-python-for-everybody': 'python-for-everybody',
+  '24-b1-english-for-developers': 'b1-english-for-developers',
+  '25-front-end-development': 'full-stack-developer'
 };
 
 function getSuperBlockFromDir(dir) {
@@ -129,6 +93,57 @@ function getSuperBlockFromDir(dir) {
   return directoryToSuperblock[dir];
 }
 
+function getChapterFromBlock(blockName, superBlockStructure) {
+  const chapters = superBlockStructure.chapters;
+  const chaptersWithBlocks = chapters.map(chapter => ({
+    ...chapter,
+    blocks: chapter.modules.flatMap(module => module.blocks)
+  }));
+
+  const chapter = chaptersWithBlocks.find(chapter =>
+    chapter.blocks.some(b => b.dashedName === blockName)
+  );
+
+  if (!chapter) {
+    throw Error(
+      `There is no chapter corresponding to block "${blockName}". It's possible that the block is missing in the superblock structure.`
+    );
+  }
+  return chapter.dashedName;
+}
+
+function getModuleFromBlock(blockName, superBlockStructure) {
+  const modules = superBlockStructure.chapters.flatMap(
+    chapter => chapter.modules
+  );
+  const module = modules.find(module =>
+    module.blocks.some(b => b.dashedName === blockName)
+  );
+  if (!module) {
+    throw Error(
+      `There is no module corresponding to block "${blockName}". It's possible that the block is missing in the superblock structure.`
+    );
+  }
+  return module.dashedName;
+}
+
+function getBlockOrder(blockName, superBlockStructure) {
+  const blocks = superBlockStructure.chapters
+    .flatMap(chapter => chapter.modules)
+    .flatMap(module => module.blocks);
+
+  const index = blocks.findIndex(block => block.dashedName === blockName);
+
+  if (index === -1)
+    throw Error(
+      `The block "${blockName}" does not appear in the superblock structure.`
+    );
+
+  return index + 1;
+}
 exports.createSuperOrder = createSuperOrder;
 exports.getSuperOrder = getSuperOrder;
 exports.getSuperBlockFromDir = getSuperBlockFromDir;
+exports.getChapterFromBlock = getChapterFromBlock;
+exports.getModuleFromBlock = getModuleFromBlock;
+exports.getBlockOrder = getBlockOrder;

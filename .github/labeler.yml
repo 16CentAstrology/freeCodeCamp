@@ -4,7 +4,7 @@
 'scope: curriculum':
   - curriculum/challenges/**/*
 
-'platform: client':
+'platform: learn':
   - client/**/*
 
 'platform: api':
@@ -12,15 +12,14 @@
   - api/**/*
 
 'scope: tools/scripts':
-  - cypress/**/*
   - tools/**/*
   - .github/**/*
   - utils/**/*
+  - e2e/**/*
 
 'scope: i18n':
   - any: ['curriculum/challenges/**/*', '!curriculum/challenges/english/**/*']
   - docs/i18n/**/*
   - client/i18n/**/*
   - config/crowdin/**/*
-  - config/i18n/**/*
-  - tools/crowdin/**/*
+  - shared/config/i18n/**/*

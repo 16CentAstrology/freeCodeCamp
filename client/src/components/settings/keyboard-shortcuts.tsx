@@ -1,28 +1,27 @@
-import { Form } from '@freecodecamp/react-bootstrap';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { Spacer } from '@freecodecamp/ui';
 
-import ToggleSetting from './toggle-setting';
+import ToggleButtonSetting from './toggle-button-setting';
 
 type KeyboardShortcutsProps = {
   keyboardShortcuts: boolean;
   toggleKeyboardShortcuts: (sound: boolean) => void;
+  explain?: string;
 };
 
 export default function KeyboardShortcutsSettings({
   keyboardShortcuts,
-  toggleKeyboardShortcuts
+  toggleKeyboardShortcuts,
+  explain
 }: KeyboardShortcutsProps): JSX.Element {
   const { t } = useTranslation();
 
   return (
-    <Form
-      inline={true}
-      onSubmit={(e: React.FormEvent) => e.preventDefault()}
-      data-testid='fcc-enable-shortcuts-setting'
-    >
-      <ToggleSetting
+    <>
+      <ToggleButtonSetting
         action={t('settings.labels.keyboard-shortcuts')}
+        explain={explain}
         flag={keyboardShortcuts}
         flagName='keyboard-shortcuts'
         offLabel={t('buttons.off')}
@@ -31,7 +30,8 @@ export default function KeyboardShortcutsSettings({
           toggleKeyboardShortcuts(keyboardShortcuts ? false : true);
         }}
       />
-    </Form>
+      <Spacer size='m' />
+    </>
   );
 }
 

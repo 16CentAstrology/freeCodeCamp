@@ -8,18 +8,17 @@ export const tryToShowDonationModal = createAction(
   actionTypes.tryToShowDonationModal
 );
 
-export const executeGA = createAction(actionTypes.executeGA);
-
 export const allowBlockDonationRequests = createAction(
   actionTypes.allowBlockDonationRequests
 );
+export const setRenderStartTime = createAction(actionTypes.setRenderStartTime);
 export const closeDonationModal = createAction(actionTypes.closeDonationModal);
 export const openDonationModal = createAction(actionTypes.openDonationModal);
 export const preventBlockDonationRequests = createAction(
   actionTypes.preventBlockDonationRequests
 );
-export const preventProgressDonationRequests = createAction(
-  actionTypes.preventProgressDonationRequests
+export const setIsRandomCompletionThreshold = createAction(
+  actionTypes.setIsRandomCompletionThreshold
 );
 export const updateDonationFormState = createAction(
   actionTypes.updateDonationFormState
@@ -53,27 +52,26 @@ export const fetchUser = createAction(actionTypes.fetchUser);
 export const fetchUserComplete = createAction(actionTypes.fetchUserComplete);
 export const fetchUserError = createAction(actionTypes.fetchUserError);
 
-export const addDonation = createAction(actionTypes.addDonation);
-export const addDonationComplete = createAction(
-  actionTypes.addDonationComplete
-);
-export const addDonationError = createAction(actionTypes.addDonationError);
+export const toggleTheme = createAction(actionTypes.toggleTheme);
+export const setTheme = createAction(actionTypes.setTheme);
+export const initializeTheme = createAction(actionTypes.initializeTheme);
 
-export const postChargeStripe = createAction(actionTypes.postChargeStripe);
-export const postChargeStripeComplete = createAction(
-  actionTypes.postChargeStripeComplete
+export const updateAllChallengesInfo = createAction(
+  actionTypes.updateAllChallengesInfo
 );
-export const postChargeStripeError = createAction(
-  actionTypes.postChargeStripeError
+
+export const postCharge = createAction(actionTypes.postCharge);
+export const postChargeProcessing = createAction(
+  actionTypes.postChargeProcessing
 );
-export const postChargeStripeCard = createAction(
-  actionTypes.postChargeStripeCard
-);
-export const postChargeStripeCardComplete = createAction(
-  actionTypes.postChargeStripeCardComplete
-);
-export const postChargeStripeCardError = createAction(
-  actionTypes.postChargeStripeCardError
+export const postChargeComplete = createAction(actionTypes.postChargeComplete);
+export const postChargeError = createAction(actionTypes.postChargeError);
+
+export const updateCard = createAction(actionTypes.updateCard);
+export const updateCardError = createAction(actionTypes.updateCardError);
+export const updateCardComplete = createAction(actionTypes.updateCardComplete);
+export const updateCardRedirecting = createAction(
+  actionTypes.updateCardRedirecting
 );
 
 export const fetchProfileForUser = createAction(
@@ -102,13 +100,20 @@ export const deleteUserTokenComplete = createAction(
   actionTypes.deleteUserTokenComplete
 );
 
-export const hideCodeAlly = createAction(actionTypes.hideCodeAlly);
-export const showCodeAlly = createAction(actionTypes.showCodeAlly);
-export const tryToShowCodeAlly = createAction(actionTypes.tryToShowCodeAlly);
+export const startExam = createAction(actionTypes.startExam);
+export const stopExam = createAction(actionTypes.stopExam);
+export const clearExamResults = createAction(actionTypes.clearExamResults);
 
-export const updateCurrentChallengeId = createAction(
-  actionTypes.updateCurrentChallengeId
+export const linkMsUsername = createAction(actionTypes.linkMsUsername);
+export const unlinkMsUsername = createAction(actionTypes.unlinkMsUsername);
+export const setMsUsername = createAction(actionTypes.setMsUsername);
+
+export const submitSurvey = createAction(actionTypes.submitSurvey);
+export const submitSurveyComplete = createAction(
+  actionTypes.submitSurveyComplete
 );
+
+export const setIsProcessing = createAction(actionTypes.setIsProcessing);
 
 export const closeSignoutModal = createAction(actionTypes.closeSignoutModal);
 export const openSignoutModal = createAction(actionTypes.openSignoutModal);

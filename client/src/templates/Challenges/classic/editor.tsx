@@ -7,15 +7,10 @@ import type {
   editor
   // eslint-disable-next-line import/no-duplicates
 } from 'monaco-editor/esm/vs/editor/editor.api';
-import { highlightAllUnder } from 'prismjs';
-import React, {
-  useEffect,
-  Suspense,
-  RefObject,
-  MutableRefObject,
-  useRef
-} from 'react';
-import ReactDOM from 'react-dom';
+import { OS } from 'monaco-editor/esm/vs/base/common/platform.js';
+import Prism from 'prismjs';
+import React, { useEffect, Suspense, MutableRefObject, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { connect } from 'react-redux';
 import { createSelector } from 'reselect';
 import store from 'store';
@@ -23,17 +18,16 @@ import store from 'store';
 import { debounce } from 'lodash-es';
 import { useTranslation } from 'react-i18next';
 import { Loader } from '../../../components/helpers';
-import { Themes } from '../../../components/settings/theme';
+import { LocalStorageThemes } from '../../../redux/types';
 import { saveChallenge } from '../../../redux/actions';
 import {
   isDonationModalOpenSelector,
   isSignedInSelector,
-  userSelector
+  themeSelector
 } from '../../../redux/selectors';
 import {
   ChallengeFiles,
   Dimensions,
-  Ext,
   FileKey,
   ResizeProps,
   Test
@@ -41,9 +35,9 @@ import {
 import { editorToneOptions } from '../../../utils/tone/editor-config';
 import { editorNotes } from '../../../utils/tone/editor-notes';
 import {
-  challengeTypes,
-  isFinalProject
-} from '../../../../utils/challenge-types';
+  canSaveToDB,
+  challengeTypes
+} from '../../../../../shared/config/challenge-types';
 import {
   executeChallenge,
   saveEditorContent,
@@ -53,42 +47,47 @@ import {
   initTests,
   stopResetting,
   openModal,
-  resetAttempts
+  resetAttempts,
+  sendRenderTime
 } from '../redux/actions';
 import {
   attemptsSelector,
   canFocusEditorSelector,
   challengeMetaSelector,
-  consoleOutputSelector,
   challengeTestsSelector,
   isResettingSelector,
   isProjectPreviewModalOpenSelector,
   isChallengeCompletedSelector
 } from '../redux/selectors';
 import GreenPass from '../../../assets/icons/green-pass';
+import {
+  enhancePrismAccessibility,
+  makePrismCollapsible,
+  setScrollbarArrowStyles
+} from '../utils/index';
+import { initializeMathJax } from '../../../utils/math-jax';
+import { getScrollbarWidth } from '../../../utils/scrollbar-width';
+import { isProjectBased } from '../../../utils/curriculum-layout';
+import envConfig from '../../../../config/env.json';
 import LowerJaw from './lower-jaw';
-
 import './editor.css';
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
 const MonacoEditor = Loadable(() => import('react-monaco-editor'));
 
-interface EditorProps {
+export interface EditorProps {
   attempts: number;
   canFocus: boolean;
   challengeFiles: ChallengeFiles;
   challengeType: number;
-  containerRef: RefObject<HTMLElement>;
-  contents: string;
+  containerRef?: React.RefObject<HTMLElement>;
+  block: string;
+  superBlock: string;
   description: string;
-  dimensions: Dimensions;
-  editorRef: MutableRefObject<editor.IStandaloneCodeEditor>;
+  dimensions?: Dimensions;
+  editorRef: MutableRefObject<editor.IStandaloneCodeEditor | undefined>;
   executeChallenge: (options?: { showCompletionModal: boolean }) => void;
-  ext: Ext;
   fileKey: FileKey;
   canFocusOnMountRef: MutableRefObject<boolean>;
-  initialEditorContent: string;
-  initialExt: string;
   initTests: (tests: Test[]) => void;
   initialTests: Test[];
   isMobileLayout: boolean;
@@ -97,16 +96,16 @@ interface EditorProps {
   isUsingKeyboardInTablist: boolean;
   openHelpModal: () => void;
   openResetModal: () => void;
-  output: string[];
   resizeProps: ResizeProps;
   saveChallenge: () => void;
+  sendRenderTime: (renderTime: number) => void;
   saveEditorContent: () => void;
   setEditorFocusability: (isFocusable: boolean) => void;
   submitChallenge: () => void;
   stopResetting: () => void;
   resetAttempts: () => void;
   tests: Test[];
-  theme: Themes;
+  theme: LocalStorageThemes;
   title: string;
   showProjectPreview: boolean;
   previewOpen: boolean;
@@ -130,7 +129,6 @@ interface EditorProperties {
   outputZoneTop: number;
   outputZoneId: string;
   descriptionNode?: HTMLDivElement;
-  outputNode?: HTMLDivElement;
   descriptionWidget?: editor.IContentWidget;
   outputWidget?: editor.IOverlayWidget;
 }
@@ -139,26 +137,24 @@ const mapStateToProps = createSelector(
   attemptsSelector,
   canFocusEditorSelector,
   challengeMetaSelector,
-  consoleOutputSelector,
   isDonationModalOpenSelector,
   isProjectPreviewModalOpenSelector,
   isResettingSelector,
   isSignedInSelector,
-  userSelector,
   challengeTestsSelector,
   isChallengeCompletedSelector,
+  themeSelector,
   (
     attempts: number,
     canFocus: boolean,
     { challengeType }: { challengeType: number },
-    output: string[],
     open,
     previewOpen: boolean,
     isResetting: boolean,
     isSignedIn: boolean,
-    { theme = Themes.Default }: { theme: Themes },
-    tests: [{ text: string; testString: string }],
-    isChallengeCompleted: boolean
+    tests: [{ text: string; testString: string; message?: string }],
+    isChallengeCompleted: boolean,
+    theme: LocalStorageThemes
   ) => ({
     attempts,
     canFocus: open ? false : canFocus,
@@ -166,10 +162,9 @@ const mapStateToProps = createSelector(
     previewOpen,
     isResetting,
     isSignedIn,
-    output,
-    theme,
     tests,
-    isChallengeCompleted
+    isChallengeCompleted,
+    theme
   })
 );
 
@@ -185,6 +180,7 @@ const mapDispatchToProps = {
   initTests,
   stopResetting,
   resetAttempts,
+  sendRenderTime,
   openHelpModal: () => openModal('help'),
   openResetModal: () => openModal('reset')
 };
@@ -193,7 +189,10 @@ const modeMap = {
   css: 'css',
   html: 'html',
   js: 'javascript',
-  jsx: 'javascript'
+  jsx: 'javascript',
+  ts: 'typescript',
+  py: 'python',
+  python: 'python'
 };
 
 let monacoThemesDefined = false;
@@ -244,16 +243,18 @@ const initialData: EditorProperties = {
 
 const Editor = (props: EditorProps): JSX.Element => {
   const { t } = useTranslation();
-  const { editorRef, initTests, resetAttempts } = props;
+  const { editorRef, initTests, resetAttempts, isMobileLayout } = props;
   // These refs are used during initialisation of the editor as well as by
   // callbacks.  Since they have to be initialised before editorWillMount and
   // editorDidMount are called, we cannot use useState.  Reason being that will
   // only take effect during the next render, which is too late. We could use
   // plain objects here, but useRef is shared between instances, so avoids
-  // unecessary object creation.
+  // unnecessary object creation.
   const monacoRef: MutableRefObject<typeof monacoEditor | null> =
     useRef<typeof monacoEditor>(null);
   const dataRef = useRef<EditorProperties>({ ...initialData });
+  const [lowerJawContainer, setLowerJawContainer] =
+    React.useState<HTMLDivElement | null>(null);
 
   const submitChallengeDebounceRef = useRef(
     debounce(props.submitChallenge, 1000, { leading: true, trailing: false })
@@ -265,7 +266,6 @@ const Editor = (props: EditorProps): JSX.Element => {
     noteIndex: number;
     shouldPlay: boolean | undefined;
   }>({
-    // eslint-disable-next-line no-undefined
     sampler: undefined,
     noteIndex: 0,
     shouldPlay: store.get('fcc-sound') as boolean | undefined
@@ -286,7 +286,9 @@ const Editor = (props: EditorProps): JSX.Element => {
     selectionHighlight: false,
     overviewRulerBorder: false,
     hideCursorInOverviewRuler: true,
-    renderIndentGuides: false,
+    renderIndentGuides:
+      props.challengeType === challengeTypes.python ||
+      props.challengeType === challengeTypes.multifilePythonCertProject,
     minimap: {
       enabled: false
     },
@@ -295,14 +297,21 @@ const Editor = (props: EditorProps): JSX.Element => {
     scrollbar: {
       horizontal: 'hidden',
       vertical: 'visible',
-      verticalHasArrows: false,
+      verticalHasArrows: true,
       useShadows: false,
-      verticalScrollbarSize: 5
+      verticalScrollbarSize: getScrollbarWidth(),
+      // this helps the scroll bar fit properly between the arrows,
+      // but doesn't do anything for the arrows themselves
+      arrowSize: getScrollbarWidth()
     },
     parameterHints: {
       enabled: false
     },
-    tabSize: 2,
+    tabSize:
+      props.challengeType !== challengeTypes.python &&
+      props.challengeType !== challengeTypes.multifilePythonCertProject
+        ? 2
+        : 4,
     dragAndDrop: true,
     lightbulb: {
       enabled: false
@@ -374,6 +383,14 @@ const Editor = (props: EditorProps): JSX.Element => {
     }
   };
 
+  const isTabTrapped = () => !!(store.get('monacoTabTrapped') ?? true);
+
+  // Monaco uses the contextKey 'editorTabMovesFocus' to control how it
+  // reacts to the Tab key. Setting it to true allows the user to tab
+  // out of the editor. False keeps it inside the editor and creates a tab.
+  const setMonacoTabTrapped = (trapped: boolean) =>
+    dataRef.current.editor?.createContextKey('editorTabMovesFocus', !trapped);
+
   const editorDidMount = (
     editor: editor.IStandaloneCodeEditor,
     monaco: typeof monacoEditor
@@ -388,6 +405,7 @@ const Editor = (props: EditorProps): JSX.Element => {
       addContentChangeListener();
       resetAttempts();
       showEditableRegion(editor);
+      initializeMathJax();
     }
 
     const storedAccessibilityMode = () => {
@@ -407,10 +425,37 @@ const Editor = (props: EditorProps): JSX.Element => {
       return accessibility;
     };
 
+    const setTabTrapped = (
+      trapped: boolean,
+      opts: { announce: boolean } = { announce: true }
+    ) => {
+      setMonacoTabTrapped(trapped);
+      store.set('monacoTabTrapped', trapped);
+      if (opts.announce) {
+        ariaAlert(
+          `${
+            trapped
+              ? t('learn.editor-alerts.tab-trapped')
+              : t('learn.editor-alerts.tab-free')
+          }`
+        );
+      }
+    };
+
+    // By default, Tab will be trapped in the monaco editor, so we only need to
+    // check if the user has turned this off.
+    if (!isTabTrapped()) {
+      setTabTrapped(false, { announce: false });
+    }
+
     const accessibilityMode = storedAccessibilityMode();
     editor.updateOptions({
       accessibilitySupport: accessibilityMode ? 'on' : 'auto'
     });
+
+    document.fonts.ready
+      .then(() => monaco.editor.remeasureFonts())
+      .catch(err => console.error(err));
 
     // Focus should not automatically leave the 'Code' tab when using a keyboard
     // to navigate the tablist.
@@ -452,17 +497,29 @@ const Editor = (props: EditorProps): JSX.Element => {
       null,
       () => {}
     );
+    // Make toggle tab setting in editor permanent
+    const tabFocusHotkeys =
+      OS === 2 /* Macintosh/iOS */
+        ? monaco.KeyMod.WinCtrl | monaco.KeyMod.Shift | monaco.KeyCode.KEY_M
+        : monaco.KeyMod.CtrlCmd | monaco.KeyCode.KEY_M;
+    // @ts-ignore
+    editor._standaloneKeybindingService.addDynamicKeybinding(
+      'editor.action.toggleTabFocusMode',
+      tabFocusHotkeys,
+      () => {
+        setTabTrapped(!isTabTrapped());
+      }
+    );
     /* eslint-enable */
     editor.addAction({
       id: 'execute-challenge',
       label: 'Run tests',
-      /* eslint-disable no-bitwise */
       keybindings: [
         monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
         monaco.KeyMod.WinCtrl | monaco.KeyCode.Enter
       ],
       run: () => {
-        if (props.usesMultifileEditor && !isFinalProject(props.challengeType)) {
+        if (props.usesMultifileEditor && !isProjectBased(props.challengeType)) {
           if (challengeIsComplete()) {
             tryToSubmitChallenge();
           } else {
@@ -490,8 +547,7 @@ const Editor = (props: EditorProps): JSX.Element => {
         monaco.KeyMod.WinCtrl | monaco.KeyCode.KEY_S
       ],
       run:
-        props.challengeType === challengeTypes.multifileCertProject &&
-        props.isSignedIn
+        canSaveToDB(props.challengeType) && props.isSignedIn
           ? // save to database
             props.saveChallenge
           : // save to local storage
@@ -524,6 +580,24 @@ const Editor = (props: EditorProps): JSX.Element => {
       ],
       run: toggleAriaRoledescription
     });
+    editor.addAction({
+      id: 'select-all-and-copy',
+      label: 'Select All and Copy',
+      contextMenuGroupId: '9_cutcopypaste',
+      contextMenuOrder: 3,
+      run: () => {
+        const fullSelection = editor.getModel()?.getFullModelRange();
+        if (fullSelection) {
+          editor.setSelection(fullSelection);
+          const data = editor.getModel()?.getValueInRange(fullSelection);
+          if (data) {
+            navigator.clipboard
+              .writeText(data)
+              .catch(err => console.error(err));
+          }
+        }
+      }
+    });
     editor.onDidFocusEditorWidget(() => props.setEditorFocusability(true));
 
     // aria-roledescription is on (true) by default, check if it needs
@@ -541,6 +615,9 @@ const Editor = (props: EditorProps): JSX.Element => {
       scrollGutterNode
     );
     editor.addContentWidget(scrollGutterWidget);
+
+    // update scrollbar arrows
+    setScrollbarArrowStyles(getScrollbarWidth());
   };
 
   const toggleAriaRoledescription = () => {
@@ -580,6 +657,17 @@ const Editor = (props: EditorProps): JSX.Element => {
       // See https://www.tpgi.com/html5-accessibility-chops-aria-rolealert-browser-support/
       liveText.style.visibility = 'hidden';
       liveText.style.visibility = 'visible';
+      // Need to remove message after a few seconds so screen readers don't
+      // run into it.
+      // First, track the latest message so it is shown for the full duration.
+      const time = `t${Date.now()}`;
+      liveText.dataset.timestamp = time;
+      setTimeout(function () {
+        // Now, only the latest message will have this timestamp.
+        if (liveText.dataset.timestamp === time) {
+          liveText.textContent = '';
+        }
+      }, 3000);
     }
   };
 
@@ -592,7 +680,7 @@ const Editor = (props: EditorProps): JSX.Element => {
 
     // make sure the overlayWidget has resized before using it to set the height
 
-    domNode.style.width = `${editor.getLayoutInfo().contentWidth}px`;
+    domNode.style.width = `${getEditorContentWidth(editor)}px`;
 
     // We have to wait for the viewZone to finish rendering before adjusting the
     // position of the content widget (i.e. trigger it via onDomNodeTop). If
@@ -623,56 +711,23 @@ const Editor = (props: EditorProps): JSX.Element => {
 
   const tryToSubmitChallenge = submitChallengeDebounceRef.current;
 
-  function createLowerJaw(
-    outputNode: HTMLDivElement,
-    editor: editor.IStandaloneCodeEditor
-  ) {
-    const { output } = props;
-    const isChallengeComplete = challengeIsComplete();
-    const isEditorInFocus = document.activeElement?.tagName === 'TEXTAREA';
-
-    ReactDOM.render(
-      <LowerJaw
-        openHelpModal={props.openHelpModal}
-        openResetModal={props.openResetModal}
-        tryToExecuteChallenge={tryToExecuteChallenge}
-        hint={output[1]}
-        testsLength={props.tests.length}
-        attempts={attemptsRef.current}
-        challengeIsCompleted={isChallengeComplete}
-        tryToSubmitChallenge={tryToSubmitChallenge}
-        isEditorInFocus={isEditorInFocus}
-        isSignedIn={props.isSignedIn}
-        updateContainer={() => updateOutputViewZone(outputNode, editor)}
-      />,
-      outputNode
-    );
-  }
-
-  const updateOutputZone = () => {
-    const editor = dataRef.current.editor;
-    if (!editor || !dataRef.current.outputNode) return;
-
-    const outputNode = dataRef.current.outputNode;
-    createLowerJaw(outputNode, editor);
-  };
-
   // TODO: there's a potential performance gain to be had by only updating when
   // the outputViewZone has actually changed.
   const updateOutputViewZone = (
-    outputNode: HTMLDivElement,
-    editor: editor.IStandaloneCodeEditor
+    lowerJawContainer: HTMLDivElement,
+    editor?: editor.IStandaloneCodeEditor
   ) => {
+    if (!editor) return;
     // make sure the overlayWidget has resized before using it to set the height
-    outputNode.style.width = `${editor.getLayoutInfo().contentWidth}px`;
+    lowerJawContainer.style.width = `${getEditorContentWidth(editor)}px`;
     // We have to wait for the viewZone to finish rendering before adjusting the
     // position of the overlayWidget (i.e. trigger it via onComputedHeight). If
     // not the editor may report the wrong value for position of the lines.
-    editor?.changeViewZones(changeAccessor => {
+    editor.changeViewZones(changeAccessor => {
       changeAccessor.removeZone(dataRef.current.outputZoneId);
       const viewZone = {
         afterLineNumber: getLastLineOfEditableRegion(),
-        heightInPx: outputNode.offsetHeight,
+        heightInPx: lowerJawContainer.offsetHeight,
         domNode: document.createElement('div'),
         onComputedHeight: () =>
           dataRef.current.outputWidget &&
@@ -693,6 +748,7 @@ const Editor = (props: EditorProps): JSX.Element => {
     const jawHeading = isChallengeCompleted
       ? document.createElement('div')
       : document.createElement('h1');
+    jawHeading.setAttribute('id', 'content-start');
     if (isChallengeCompleted) {
       jawHeading.classList.add('challenge-description-header');
       const challengeTitle = document.createElement('h1');
@@ -701,14 +757,7 @@ const Editor = (props: EditorProps): JSX.Element => {
       )}</span>`;
       jawHeading.appendChild(challengeTitle);
       const checkmark = ReactDOMServer.renderToStaticMarkup(
-        <GreenPass
-          hushScreenReaderText
-          style={{
-            height: '15px',
-            width: '15px',
-            marginLeft: '7px'
-          }}
-        />
+        <GreenPass hushScreenReaderText />
       );
       const completedChallengeHeader = document.createElement('div');
       completedChallengeHeader.innerHTML = checkmark;
@@ -722,31 +771,44 @@ const Editor = (props: EditorProps): JSX.Element => {
     descContainer.classList.add('description-container');
     domNode.classList.add('editor-upper-jaw');
     domNode.appendChild(descContainer);
+    if (isMobileLayout) descContainer.appendChild(createBreadcrumb());
     descContainer.appendChild(jawHeading);
     descContainer.appendChild(desc);
     desc.innerHTML = description;
-    highlightAllUnder(desc);
+    Prism.hooks.add('complete', enhancePrismAccessibility);
+    Prism.hooks.add('complete', makePrismCollapsible);
+    Prism.highlightAllUnder(desc);
+
+    // Since the description can be resized without React knowing about it, the
+    // zone needs updating in response.
+    const obs = new ResizeObserver(() => updateDescriptionZone());
+    obs.observe(domNode);
 
     domNode.style.userSelect = 'text';
 
     domNode.style.left = `${editor.getLayoutInfo().contentLeft}px`;
-    domNode.style.width = `${editor.getLayoutInfo().contentWidth}px`;
+    domNode.style.width = `${getEditorContentWidth(editor)}px`;
 
     domNode.style.top = getDescriptionZoneTop();
     dataRef.current.descriptionNode = domNode;
     return domNode;
   }
 
-  function createOutputNode(editor: editor.IStandaloneCodeEditor) {
-    if (dataRef.current.outputNode) return dataRef.current.outputNode;
-    const outputNode = document.createElement('div');
-    outputNode.classList.add('editor-lower-jaw');
-    outputNode.setAttribute('id', 'editor-lower-jaw');
-    outputNode.style.left = `${editor.getLayoutInfo().contentLeft}px`;
-    outputNode.style.width = `${editor.getLayoutInfo().contentWidth}px`;
-    outputNode.style.top = getOutputZoneTop();
-    dataRef.current.outputNode = outputNode;
-    return outputNode;
+  // Take the current scrollbar width into account
+  function getEditorContentWidth(editor: editor.IStandaloneCodeEditor) {
+    return editor.getLayoutInfo().contentWidth - getScrollbarWidth();
+  }
+
+  function createLowerJawContainer(editor: editor.IStandaloneCodeEditor) {
+    if (lowerJawContainer) return lowerJawContainer;
+    const container = document.createElement('div');
+    container.classList.add('editor-lower-jaw');
+    container.setAttribute('id', 'editor-lower-jaw');
+    container.style.left = `${editor.getLayoutInfo().contentLeft}px`;
+    container.style.width = `${getEditorContentWidth(editor)}px`;
+    container.style.top = getOutputZoneTop();
+    setLowerJawContainer(container);
+    return container;
   }
 
   function createScrollGutterNode(
@@ -771,26 +833,24 @@ const Editor = (props: EditorProps): JSX.Element => {
   }
 
   function focusOnHotkeys() {
-    const currContainerRef = props.containerRef.current;
+    const currContainerRef = props.containerRef?.current;
     if (currContainerRef) {
       currContainerRef.focus();
     }
   }
 
   const onChange = (editorValue: string) => {
-    const { updateFile, fileKey } = props;
+    const { updateFile, fileKey, isResetting } = props;
+    if (isResetting) return;
     // TODO: now that we have getCurrentEditableRegion, should the overlays
     // follow that directly? We could subscribe to changes to that and redraw if
     // those imply that the positions have changed (i.e. if the content height
     // has changed or if content is dragged between regions)
 
     const coveringRange = getLinesCoveringEditableRegion();
-    const editableRegionBoundaries =
-      (coveringRange && [
-        coveringRange.startLineNumber - 1,
-        coveringRange.endLineNumber + 1
-      ]) ??
-      undefined;
+    const editableRegionBoundaries = coveringRange
+      ? [coveringRange.startLineNumber - 1, coveringRange.endLineNumber + 1]
+      : [];
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     if (player.current.sampler?.loaded && player.current.shouldPlay) {
@@ -808,6 +868,35 @@ const Editor = (props: EditorProps): JSX.Element => {
     }
     updateFile({ fileKey, editorValue, editableRegionBoundaries });
   };
+
+  function createBreadcrumb(): HTMLElement {
+    const { block, superBlock } = props;
+    const breadcrumb = document.createElement('nav');
+    breadcrumb.setAttribute('aria-label', `${t('aria.breadcrumb-nav')}`);
+    const breadcrumbList = document.createElement('ol'),
+      breadcrumbLeft = document.createElement('li'),
+      breadcrumbLeftLink = document.createElement('a'),
+      breadcrumbRight = document.createElement('li'),
+      breadcrumbRightLink = document.createElement('a');
+    breadcrumbLeftLink.innerHTML = t(`intro:${superBlock}.title`);
+    breadcrumbRightLink.innerHTML = t(
+      `intro:${superBlock}.blocks.${block}.title`
+    );
+    breadcrumbLeftLink.setAttribute('href', `/learn/${superBlock}`);
+    breadcrumbRightLink.setAttribute('href', `/learn/${superBlock}/#${block}`);
+    breadcrumbLeft.appendChild(breadcrumbLeftLink);
+    breadcrumbRight.appendChild(breadcrumbRightLink);
+    breadcrumbList.setAttribute(
+      'data-playwright-test-label',
+      'breadcrumb-mobile'
+    );
+    breadcrumbList.className = 'breadcrumbs';
+    breadcrumbList.appendChild(breadcrumbLeft);
+    breadcrumbList.appendChild(breadcrumbRight);
+    breadcrumb.appendChild(breadcrumbList);
+
+    return breadcrumb;
+  }
 
   // TODO: DRY this and the update function
   function initializeEditableRegion(
@@ -954,7 +1043,7 @@ const Editor = (props: EditorProps): JSX.Element => {
     const getDomNode = () => domNode;
     const getPosition = () => {
       if (getTop) {
-        domNode.style.width = `${editor.getLayoutInfo().contentWidth}px`;
+        domNode.style.width = `${getEditorContentWidth(editor)}px`;
         domNode.style.top = getTop();
       }
       // must return null, so that Monaco knows the widget will position
@@ -980,7 +1069,7 @@ const Editor = (props: EditorProps): JSX.Element => {
   function addWidgetsToRegions(editor: editor.IStandaloneCodeEditor) {
     const descriptionNode = createDescription(editor);
 
-    const outputNode = createOutputNode(editor);
+    const lowerJawNode = createLowerJawContainer(editor);
 
     if (!dataRef.current.descriptionWidget) {
       dataRef.current.descriptionWidget = createWidget(
@@ -1006,11 +1095,10 @@ const Editor = (props: EditorProps): JSX.Element => {
       dataRef.current.outputWidget = createWidget(
         editor,
         'output.widget',
-        outputNode,
+        lowerJawNode,
         getOutputZoneTop
       );
       editor.addOverlayWidget(dataRef.current.outputWidget);
-      editor.changeViewZones(updateOutputZone);
     }
 
     editor.onDidScrollChange(() => {
@@ -1033,13 +1121,11 @@ const Editor = (props: EditorProps): JSX.Element => {
           updateEditableRegion(coveringRange, { model });
         }
       };
-
       // If the content has changed, the zones may need moving. Rather than
       // working out if they have to for a particular content change, we simply
       // ask monaco to update regardless.
       redecorateEditableRegion();
       updateDescriptionZone();
-      updateOutputZone();
     });
   }
 
@@ -1128,6 +1214,11 @@ const Editor = (props: EditorProps): JSX.Element => {
   }, [props.challengeFiles, props.isResetting]);
 
   useEffect(() => {
+    props.sendRenderTime(Date.now());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.description]);
+
+  useEffect(() => {
     const { showProjectPreview, previewOpen } = props;
     if (!previewOpen && showProjectPreview) {
       const description = document.getElementsByClassName(
@@ -1140,7 +1231,6 @@ const Editor = (props: EditorProps): JSX.Element => {
 
   useEffect(() => {
     const { model, insideEditDecId } = dataRef.current;
-    const lowerJawElement = dataRef.current.outputNode;
     const isChallengeComplete = challengeIsComplete();
     const range = model?.getDecorationRange(insideEditDecId);
     if (range && isChallengeComplete) {
@@ -1152,17 +1242,16 @@ const Editor = (props: EditorProps): JSX.Element => {
         }
       );
     }
-    dataRef.current.outputNode = lowerJawElement;
-    updateOutputZone();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.tests]);
 
   useEffect(() => {
     const editor = dataRef.current.editor;
     editor?.layout();
-    if (hasEditableRegion()) {
-      updateDescriptionZone();
-      updateOutputZone();
+    // layout() resets the monaco tab trapping back to default (true), so we
+    // need to untrap it if the user had it set to false.
+    if (!isTabTrapped()) {
+      setMonacoTabTrapped(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.dimensions]);
@@ -1176,9 +1265,31 @@ const Editor = (props: EditorProps): JSX.Element => {
   }
 
   const { theme } = props;
-  const editorTheme = theme === Themes.Night ? 'vs-dark-custom' : 'vs-custom';
+
+  const preferDarkScheme = window.matchMedia(
+    '(prefers-color-scheme: dark)'
+  ).matches;
+  const editorSystemTheme = preferDarkScheme ? 'vs-dark-custom' : 'vs-custom';
+  const editorTheme =
+    theme === LocalStorageThemes.Dark
+      ? 'vs-dark-custom'
+      : theme === LocalStorageThemes.Light
+        ? 'vs-custom'
+        : editorSystemTheme;
+
+  const firstFailedTest = props.tests.find(test => !!test.err);
+
+  const handleSubmitAndGoButtonBoolean = () => {
+    const canShowModal = sessionStorage.getItem('canOpenModal');
+
+    if (canShowModal === 'false' && envConfig.environment === 'development') {
+      return false;
+    }
+    return challengeIsComplete();
+  };
+
   return (
-    <Suspense fallback={<Loader timeout={600} />}>
+    <Suspense fallback={<Loader loaderDelay={600} />}>
       <span className='notranslate'>
         <MonacoEditor
           editorDidMount={editorDidMount}
@@ -1188,6 +1299,24 @@ const Editor = (props: EditorProps): JSX.Element => {
           theme={editorTheme}
         />
       </span>
+      {lowerJawContainer !== null &&
+        createPortal(
+          <LowerJaw
+            openHelpModal={props.openHelpModal}
+            openResetModal={props.openResetModal}
+            tryToExecuteChallenge={tryToExecuteChallenge}
+            hint={firstFailedTest?.message}
+            testsLength={props.tests.length}
+            attempts={attemptsRef.current}
+            challengeIsCompleted={handleSubmitAndGoButtonBoolean()}
+            tryToSubmitChallenge={tryToSubmitChallenge}
+            isSignedIn={props.isSignedIn}
+            updateContainer={() =>
+              updateOutputViewZone(lowerJawContainer, dataRef.current.editor)
+            }
+          />,
+          lowerJawContainer
+        )}
     </Suspense>
   );
 };

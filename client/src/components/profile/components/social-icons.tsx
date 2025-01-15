@@ -1,13 +1,14 @@
 import {
   faLinkedin,
   faGithub,
-  faTwitter
+  faXTwitter
 } from '@fortawesome/free-brands-svg-icons';
 import { faLink } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { Row, Col } from '@freecodecamp/react-bootstrap';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { Col, Row } from '@freecodecamp/ui';
+
 import './social-icons.css';
 
 interface SocialIconsProps {
@@ -20,12 +21,17 @@ interface SocialIconsProps {
   website: string;
 }
 
-function LinkedInIcon(linkedIn: string, username: string): JSX.Element {
+interface IconProps {
+  href: string;
+  username: string;
+}
+
+function LinkedInIcon({ href, username }: IconProps): JSX.Element {
   const { t } = useTranslation();
   return (
     <a
-      aria-label={t('aria.linkedin', { username: username })}
-      href={linkedIn}
+      aria-label={t('aria.linkedin', { username })}
+      href={href}
       rel='noopener noreferrer'
       target='_blank'
     >
@@ -34,12 +40,12 @@ function LinkedInIcon(linkedIn: string, username: string): JSX.Element {
   );
 }
 
-function GithubIcon(ghURL: string, username: string): JSX.Element {
+function GitHubIcon({ href, username }: IconProps): JSX.Element {
   const { t } = useTranslation();
   return (
     <a
-      aria-label={t('aria.github', { username: username })}
-      href={ghURL}
+      aria-label={t('aria.github', { username })}
+      href={href}
       rel='noopener noreferrer'
       target='_blank'
     >
@@ -48,12 +54,12 @@ function GithubIcon(ghURL: string, username: string): JSX.Element {
   );
 }
 
-function WebsiteIcon(website: string, username: string): JSX.Element {
+function WebsiteIcon({ href, username }: IconProps): JSX.Element {
   const { t } = useTranslation();
   return (
     <a
-      aria-label={t('aria.website', { username: username })}
-      href={website}
+      aria-label={t('aria.website', { username })}
+      href={href}
       rel='noopener noreferrer'
       target='_blank'
     >
@@ -62,16 +68,16 @@ function WebsiteIcon(website: string, username: string): JSX.Element {
   );
 }
 
-function TwitterIcon(handle: string, username: string): JSX.Element {
+function TwitterIcon({ href, username }: IconProps): JSX.Element {
   const { t } = useTranslation();
   return (
     <a
-      aria-label={t('aria.twitter', { username: username })}
-      href={handle}
+      aria-label={t('aria.twitter', { username })}
+      href={href}
       rel='noopener noreferrer'
       target='_blank'
     >
-      <FontAwesomeIcon icon={faTwitter} size='2x' />
+      <FontAwesomeIcon icon={faXTwitter} size='2x' />
     </a>
   );
 }
@@ -85,11 +91,13 @@ function SocialIcons(props: SocialIconsProps): JSX.Element | null {
 
   return (
     <Row>
-      <Col className='text-center social-media-icons' sm={6} smOffset={3}>
-        {linkedin ? LinkedInIcon(linkedin, username) : null}
-        {githubProfile ? GithubIcon(githubProfile, username) : null}
-        {website ? WebsiteIcon(website, username) : null}
-        {twitter ? TwitterIcon(twitter, username) : null}
+      <Col className='social-icons-row'>
+        {linkedin ? <LinkedInIcon href={linkedin} username={username} /> : null}
+        {githubProfile ? (
+          <GitHubIcon href={githubProfile} username={username} />
+        ) : null}
+        {website ? <WebsiteIcon href={website} username={username} /> : null}
+        {twitter ? <TwitterIcon href={twitter} username={username} /> : null}
       </Col>
     </Row>
   );

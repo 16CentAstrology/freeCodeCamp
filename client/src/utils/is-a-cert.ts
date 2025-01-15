@@ -1,17 +1,13 @@
-import { SuperBlocks } from '../../../config/certification-settings';
-
-export function isNewRespCert(superBlock: string): boolean {
-  return superBlock === SuperBlocks.RespWebDesignNew;
-}
+import { SuperBlocks } from '../../../shared/config/curriculum';
 
 export function isOldRespCert(superBlock: string): boolean {
-  return superBlock === SuperBlocks.RespWebDesign;
-}
-
-export function isNewJsCert(superBlock: string): boolean {
-  return superBlock === SuperBlocks.JsAlgoDataStructNew;
+  return superBlock === String(SuperBlocks.RespWebDesign);
 }
 
 export function isRelationalDbCert(superBlock: string): boolean {
-  return superBlock === SuperBlocks.RelationalDb;
+  return superBlock === String(SuperBlocks.RelationalDb);
+}
+
+export function isExamCert(superBlock: string): boolean {
+  return superBlock === String(SuperBlocks.FoundationalCSharp);
 }

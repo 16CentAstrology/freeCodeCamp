@@ -1,56 +1,79 @@
-import { Link } from 'gatsby';
 import React from 'react';
 import { withTranslation, useTranslation } from 'react-i18next';
-import { connect } from 'react-redux';
-import { bindActionCreators } from 'redux';
-import type { Dispatch } from 'redux';
 
 import GreenNotCompleted from '../../../assets/icons/green-not-completed';
 import GreenPass from '../../../assets/icons/green-pass';
-import { executeGA } from '../../../redux/actions';
-import { SuperBlocks } from '../../../../../config/certification-settings';
-import { ExecuteGaArg } from '../../../pages/donate';
-import { ChallengeWithCompletedNode } from '../../../redux/prop-types';
-import { isNewJsCert, isNewRespCert } from '../../../utils/is-a-cert';
-
-const mapDispatchToProps = (dispatch: Dispatch) =>
-  bindActionCreators({ executeGA }, dispatch);
+import { ExtendedChallenge } from '../../../redux/prop-types';
+import { SuperBlocks } from '../../../../../shared/config/curriculum';
+import { challengeTypes } from '../../../../../shared/config/challenge-types';
+import { Link } from '../../../components/helpers';
+import { ButtonLink } from '../../../components/helpers/button-link';
 
 interface Challenges {
-  challengesWithCompleted: ChallengeWithCompletedNode[];
-  executeGA: (payload: ExecuteGaArg) => void;
+  challenges: ExtendedChallenge[];
   isProjectBlock: boolean;
-  superBlock: SuperBlocks;
+  isGridMap?: boolean;
   blockTitle?: string | null;
 }
 
+const CheckMark = ({ isCompleted }: { isCompleted: boolean }) =>
+  isCompleted ? <GreenPass /> : <GreenNotCompleted />;
+
+const ListChallenge = ({ challenge }: { challenge: ExtendedChallenge }) => (
+  <Link to={challenge.fields.slug}>
+    <span className='map-badge'>
+      <CheckMark isCompleted={challenge.isCompleted} />
+    </span>
+    {challenge.title}
+  </Link>
+);
+
+const CertChallenge = ({ challenge }: { challenge: ExtendedChallenge }) => (
+  <Link to={challenge.fields.slug}>
+    {challenge.title}
+    <span className='map-badge map-project-checkmark'>
+      <CheckMark isCompleted={challenge.isCompleted} />
+    </span>
+  </Link>
+);
+
+// Step or Task challenge
+const GridChallenge = ({ challenge }: { challenge: ExtendedChallenge }) => {
+  const { t } = useTranslation();
+
+  return (
+    <Link
+      to={challenge.fields.slug}
+      className={`map-grid-item ${
+        +challenge.isCompleted ? 'challenge-completed' : ''
+      }`}
+    >
+      <span className='sr-only'>
+        {challenge.superBlock === SuperBlocks.A2English
+          ? t('aria.task')
+          : t('aria.step')}
+      </span>
+      <span>{challenge.stepNumber}</span>
+      <span className='sr-only'>
+        {challenge.isCompleted ? t('icons.passed') : t('icons.not-passed')}
+      </span>
+    </Link>
+  );
+};
+
 function Challenges({
-  challengesWithCompleted,
-  executeGA,
+  challenges,
   isProjectBlock,
-  superBlock,
+  isGridMap = false,
   blockTitle
 }: Challenges): JSX.Element {
   const { t } = useTranslation();
-  const handleChallengeClick = (slug: string) =>
-    executeGA({
-      type: 'event',
-      data: {
-        category: 'Map Challenge Click',
-        action: slug
-      }
-    });
 
-  const renderCheckMark = (isCompleted: boolean) =>
-    isCompleted ? <GreenPass /> : <GreenNotCompleted />;
-
-  const isGridMap = isNewRespCert(superBlock) || isNewJsCert(superBlock);
-
-  const firstIncompleteChallenge = challengesWithCompleted.find(
+  const firstIncompleteChallenge = challenges.find(
     challenge => !challenge.isCompleted
   );
 
-  const isChallengeStarted = !!challengesWithCompleted.find(
+  const isChallengeStarted = !!challenges.find(
     challenge => challenge.isCompleted
   );
 
@@ -58,60 +81,43 @@ function Challenges({
     <>
       {firstIncompleteChallenge && (
         <div className='challenge-jump-link'>
-          <Link
-            className='btn btn-primary'
-            onClick={() =>
-              handleChallengeClick(firstIncompleteChallenge.fields.slug)
-            }
-            to={firstIncompleteChallenge.fields.slug}
-          >
+          <ButtonLink size='small' href={firstIncompleteChallenge.fields.slug}>
             {!isChallengeStarted
               ? t('buttons.start-project')
               : t('buttons.resume-project')}{' '}
             {blockTitle && <span className='sr-only'>{blockTitle}</span>}
-          </Link>
+          </ButtonLink>
         </div>
       )}
       <nav
         aria-label={
-          blockTitle ? t('aria.steps-for', { blockTitle }) : t('aria.steps')
+          blockTitle
+            ? challenges[0].superBlock === SuperBlocks.A2English
+              ? t('aria.dialogues-and-tasks-for', { blockTitle })
+              : t('aria.steps-for', { blockTitle })
+            : t('aria.steps')
         }
       >
         <ul className={`map-challenges-ul map-challenges-grid `}>
-          {challengesWithCompleted.map((challenge, i) => (
+          {challenges.map(challenge => (
             <li
               className={`map-challenge-title map-challenge-title-grid ${
-                isProjectBlock ? 'map-project-wrap' : 'map-challenge-wrap'
+                isProjectBlock
+                  ? 'map-project-wrap'
+                  : challenge.challengeType === challengeTypes.dialogue
+                    ? 'map-dialogue-wrap'
+                    : 'map-challenge-wrap'
               }`}
               id={challenge.dashedName}
               key={`map-challenge ${challenge.fields.slug}`}
             >
-              {!isProjectBlock ? (
-                <Link
-                  onClick={() => handleChallengeClick(challenge.fields.slug)}
-                  to={challenge.fields.slug}
-                  className={`map-grid-item ${
-                    +challenge.isCompleted ? 'challenge-completed' : ''
-                  }`}
-                >
-                  <span className='sr-only'>{t('aria.step')}</span>
-                  <span>{i + 1}</span>
-                  <span className='sr-only'>
-                    {challenge.isCompleted
-                      ? t('icons.passed')
-                      : t('icons.not-passed')}
-                  </span>
-                </Link>
+              {!isProjectBlock &&
+              challenge.challengeType !== challengeTypes.dialogue ? (
+                <GridChallenge challenge={challenge} />
+              ) : challenge.challengeType === challengeTypes.dialogue ? (
+                <ListChallenge challenge={challenge} />
               ) : (
-                <Link
-                  onClick={() => handleChallengeClick(challenge.fields.slug)}
-                  to={challenge.fields.slug}
-                >
-                  {challenge.title}
-                  <span className=' badge map-badge map-project-checkmark'>
-                    {renderCheckMark(challenge.isCompleted)}
-                  </span>
-                </Link>
+                <CertChallenge challenge={challenge} />
               )}
             </li>
           ))}
@@ -120,7 +126,7 @@ function Challenges({
     </>
   ) : (
     <ul className={`map-challenges-ul`}>
-      {challengesWithCompleted.map(challenge => (
+      {challenges.map(challenge => (
         <li
           className={`map-challenge-title ${
             isProjectBlock ? 'map-project-wrap' : 'map-challenge-wrap'
@@ -129,25 +135,9 @@ function Challenges({
           key={'map-challenge' + challenge.fields.slug}
         >
           {!isProjectBlock ? (
-            <Link
-              onClick={() => handleChallengeClick(challenge.fields.slug)}
-              to={challenge.fields.slug}
-            >
-              <span className='badge map-badge'>
-                {renderCheckMark(challenge.isCompleted)}
-              </span>
-              {challenge.title}
-            </Link>
+            <ListChallenge challenge={challenge} />
           ) : (
-            <Link
-              onClick={() => handleChallengeClick(challenge.fields.slug)}
-              to={challenge.fields.slug}
-            >
-              {challenge.title}
-              <span className='badge map-badge map-project-checkmark'>
-                {renderCheckMark(challenge.isCompleted)}
-              </span>
-            </Link>
+            <CertChallenge challenge={challenge} />
           )}
         </li>
       ))}
@@ -157,4 +147,4 @@ function Challenges({
 
 Challenges.displayName = 'Challenges';
 
-export default connect(null, mapDispatchToProps)(withTranslation()(Challenges));
+export default withTranslation()(Challenges);

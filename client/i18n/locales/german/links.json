@@ -1,5 +1,5 @@
 {
-  "help-translate-link-url": "https://contribute.freecodecamp.org/#/i18n/german/how-to-translate-files",
+  "help-translate-link-url": "https://contribute.freecodecamp.org/getting-started/#translations",
   "top-contributors": "https://www.freecodecamp.org/news/freecodecamp-top-contributors/",
   "footer": {
     "about-url": "https://www.freecodecamp.org/news/about/",
@@ -19,13 +19,16 @@
     "one-time-url": "https://paypal.me/freecodecamp"
   },
   "nav": {
+    "contribute": "https://contribute.freecodecamp.org/#/i18n/german/index",
     "forum": "https://forum.freecodecamp.org/c/german/577",
-    "news": "https://freecodecamp.org/german/news/"
+    "news": "https://freecodecamp.org/german/news/",
+    "podcast": "https://freecodecamp.libsyn.com/"
   },
   "help": {
     "HTML-CSS": "German/HTML-CSS",
     "JavaScript": "German/JavaScript",
     "Python": "German/Python",
-    "Backend Development": "German/programming-help"
+    "Backend Development": "German/programming-help",
+    "English": "English"
   }
 }

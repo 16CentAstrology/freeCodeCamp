@@ -1,5 +1,5 @@
 {
-  "help-translate-link-url": "https://contribute.freecodecamp.org/#/i18n/ukrainian/how-to-translate-files",
+  "help-translate-link-url": "https://contribute.freecodecamp.org/getting-started/#translations",
   "top-contributors": "https://www.freecodecamp.org/news/freecodecamp-top-contributors/",
   "footer": {
     "about-url": "https://www.freecodecamp.org/ukrainian/news/chapy-freecodecamp/",
@@ -19,13 +19,16 @@
     "one-time-url": "https://paypal.me/freecodecamp"
   },
   "nav": {
+    "contribute": "https://contribute.freecodecamp.org/#/i18n/ukrainian/index",
     "forum": "https://forum.freecodecamp.org/c/ukrainian/",
-    "news": "https://www.freecodecamp.org/ukrainian/news/"
+    "news": "https://www.freecodecamp.org/ukrainian/news/",
+    "podcast": "https://freecodecamp.libsyn.com/"
   },
   "help": {
     "HTML-CSS": "Ukrainian/HTML-CSS",
     "JavaScript": "Ukrainian/JavaScript",
     "Python": "Ukrainian/Python",
-    "Backend Development": "Ukrainian/programming-help"
+    "Backend Development": "Ukrainian/programming-help",
+    "English": "English"
   }
 }

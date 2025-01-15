@@ -14,17 +14,13 @@ export interface State {
   [MainApp]: {
     appUsername: string;
     recentlyClaimedBlock: null | string;
-    canRequestProgressDonation: boolean;
-    completionCount: number;
+    showMultipleProgressModals: boolean;
     currentChallengId: string;
     showCert: Record<string, unknown>;
     showCertFetchState: DefaultFetchState;
     user: Record<string, unknown>;
     userFetchState: DefaultFetchState;
     userProfileFetchState: DefaultFetchState;
-    sessionMeta: {
-      activeDonations: number;
-    };
     showDonationModal: boolean;
     showSignoutModal: boolean;
     isOnline: boolean;
@@ -50,16 +46,29 @@ interface DefaultDonationFormState {
   error: null | string;
 }
 
-export const defaultFetchState = {
-  pending: true,
-  complete: false,
-  errored: false,
-  error: null
-};
+export interface DonateFormState {
+  processing: boolean;
+  redirecting: boolean;
+  success: boolean;
+  error: string;
+  loading: {
+    stripe: boolean;
+    paypal: boolean;
+  };
+}
 
-export const defaultDonationFormState = {
-  redirecting: false,
-  processing: false,
-  success: false,
-  error: ''
-};
+export interface UpdateCardState {
+  redirecting: boolean;
+  success: boolean;
+  error: string;
+}
+
+export enum LocalStorageThemes {
+  Light = 'light',
+  Dark = 'dark'
+}
+
+export enum UserThemes {
+  Night = 'night',
+  Default = 'default'
+}

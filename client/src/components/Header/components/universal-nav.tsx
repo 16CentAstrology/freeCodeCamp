@@ -1,73 +1,73 @@
 import Loadable from '@loadable/component';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import Media from 'react-responsive';
+import { useMediaQuery } from 'react-responsive';
 import { isLanding } from '../../../utils/path-parsers';
 import { Link, SkeletonSprite } from '../../helpers';
-import { User } from '../../../redux/prop-types';
+import { SEARCH_EXPOSED_WIDTH } from '../../../../config/misc';
+import FreeCodeCampLogo from '../../../assets/icons/freecodecamp-logo';
 import MenuButton from './menu-button';
-import NavLinks from './nav-links';
-import NavLogo from './nav-logo';
-import './universal-nav.css';
+import NavLinks, { type NavLinksProps } from './nav-links';
 import AuthOrProfile from './auth-or-profile';
+import LanguageList from './language-list';
+
+import './universal-nav.css';
 
 const SearchBar = Loadable(() => import('../../search/searchBar/search-bar'));
 const SearchBarOptimized = Loadable(
   () => import('../../search/searchBar/search-bar-optimized')
 );
 
-const MAX_MOBILE_WIDTH = 980;
-
-interface UniversalNavProps {
-  displayMenu: boolean;
-  isLanguageMenuDisplayed: boolean;
+type UniversalNavProps = Omit<
+  NavLinksProps,
+  'toggleTheme' | 'openSignoutModal'
+> & {
   fetchState: { pending: boolean };
-  menuButtonRef: React.RefObject<HTMLButtonElement>;
   searchBarRef?: React.RefObject<HTMLDivElement>;
-  showMenu: () => void;
-  hideMenu: () => void;
-  showLanguageMenu: (elementToFocus: HTMLButtonElement) => void;
-  hideLanguageMenu: () => void;
-  user?: User;
-}
-export const UniversalNav = ({
+  pathname: string;
+};
+const UniversalNav = ({
   displayMenu,
-  isLanguageMenuDisplayed,
   showMenu,
   hideMenu,
-  showLanguageMenu,
-  hideLanguageMenu,
   menuButtonRef,
   searchBarRef,
   user,
-  fetchState
+  fetchState,
+  pathname
 }: UniversalNavProps): JSX.Element => {
   const { pending } = fetchState;
   const { t } = useTranslation();
+  const isSearchExposedWidth = useMediaQuery({
+    query: `(min-width: ${SEARCH_EXPOSED_WIDTH}px)`
+  });
 
-  const search =
-    typeof window !== `undefined` && isLanding(window.location.pathname) ? (
-      <SearchBarOptimized innerRef={searchBarRef} />
-    ) : (
-      <SearchBar innerRef={searchBarRef} />
-    );
-
+  const search = isLanding(pathname) ? (
+    <SearchBarOptimized innerRef={searchBarRef} />
+  ) : (
+    <SearchBar innerRef={searchBarRef} />
+  );
   return (
     <nav
       aria-label={t('aria.primary-nav')}
-      className={`universal-nav${displayMenu ? ' expand-nav' : ''}`}
+      className='universal-nav'
       id='universal-nav'
+      data-playwright-test-label='header-universal-nav'
     >
-      <div
-        className={`universal-nav-left${displayMenu ? ' display-search' : ''}`}
+      {isSearchExposedWidth && (
+        <div className='universal-nav-left'>{search}</div>
+      )}
+      <Link
+        className='universal-nav-logo'
+        id='universal-nav-logo'
+        to='/learn'
+        data-playwright-test-label='header-universal-nav-logo'
       >
-        <Media minWidth={MAX_MOBILE_WIDTH + 1}>{search}</Media>
-      </div>
-      <div className='universal-nav-middle'>
-        <Link id='universal-nav-logo' to='/learn'>
-          <NavLogo />
-        </Link>
-      </div>
+        <FreeCodeCampLogo
+          aria-label={t('aria.fcc-curriculum')}
+          data-playwright-test-label='header-logo'
+        />
+      </Link>
       <div className='universal-nav-right main-nav'>
         {pending ? (
           <div className='nav-skeleton'>
@@ -75,6 +75,7 @@ export const UniversalNav = ({
           </div>
         ) : (
           <>
+            <LanguageList />
             <MenuButton
               displayMenu={displayMenu}
               hideMenu={hideMenu}
@@ -82,21 +83,15 @@ export const UniversalNav = ({
               showMenu={showMenu}
               user={user}
             />
-            <Media maxWidth={MAX_MOBILE_WIDTH}>{search}</Media>
+            {!isSearchExposedWidth && search}
             <NavLinks
               displayMenu={displayMenu}
-              fetchState={fetchState}
-              isLanguageMenuDisplayed={isLanguageMenuDisplayed}
-              hideLanguageMenu={hideLanguageMenu}
               hideMenu={hideMenu}
               menuButtonRef={menuButtonRef}
-              showLanguageMenu={showLanguageMenu}
               showMenu={showMenu}
               user={user}
             />
-            <div className='navatar'>
-              <AuthOrProfile user={user} />
-            </div>
+            <AuthOrProfile user={user} />
           </>
         )}
       </div>

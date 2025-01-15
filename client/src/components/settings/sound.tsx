@@ -1,12 +1,11 @@
-import { Form } from '@freecodecamp/react-bootstrap';
 import React, { ChangeEvent, useState } from 'react';
 import store from 'store';
 import { useTranslation } from 'react-i18next';
-import { Spacer } from '../helpers';
 
 import './sound.css';
+import { Spacer } from '@freecodecamp/ui';
 import { playTone } from '../../utils/tone';
-import ToggleSetting from './toggle-setting';
+import ToggleButtonSetting from './toggle-button-setting';
 
 type SoundProps = {
   sound: boolean;
@@ -40,8 +39,8 @@ export default function SoundSettings({
   }
 
   return (
-    <Form inline={true} onSubmit={(e: React.FormEvent) => e.preventDefault()}>
-      <ToggleSetting
+    <>
+      <ToggleButtonSetting
         action={t('settings.labels.sound-mode')}
         explain={t('settings.sound-mode')}
         flag={sound}
@@ -65,8 +64,8 @@ export default function SoundSettings({
         className='soundbar'
         onInput={handleVolumeChange}
       />
-      <Spacer></Spacer>
-    </Form>
+      <Spacer size='m' />
+    </>
   );
 }
 

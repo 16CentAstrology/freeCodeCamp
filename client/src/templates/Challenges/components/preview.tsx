@@ -5,7 +5,7 @@ import { mainPreviewId, scrollManager } from '../utils/frame';
 
 import './preview.css';
 
-interface PreviewProps {
+export interface PreviewProps {
   className?: string;
   disableIframe?: boolean;
   previewMounted: () => void;
@@ -38,7 +38,10 @@ function Preview({
   const id = previewId ?? mainPreviewId;
 
   return (
-    <div className={`notranslate challenge-preview ${iframeToggle}-iframe`}>
+    <div
+      data-playwright-test-label='preview-iframe'
+      className={`notranslate challenge-preview ${iframeToggle}-iframe`}
+    >
       <iframe
         className={'challenge-preview-frame'}
         id={id}
